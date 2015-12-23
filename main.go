@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	tmpltext "text/template"
 	"time"
@@ -121,12 +122,16 @@ func main() {
 		return n
 	}
 
+	waitExit := &sync.WaitGroup{}
+
 	reload := func() (err error) {
+		waitExit.Add(1)
 		log.With("file", *configFile).Infof("Loading configuration file")
 		defer func() {
 			if err != nil {
 				log.With("file", *configFile).Errorf("Loading configuration file failed: %s", err)
 			}
+			waitExit.Done()
 		}()
 
 		conf, err := config.LoadFile(*configFile)
@@ -155,6 +160,7 @@ func main() {
 	}
 
 	if err := reload(); err != nil {
+		waitExit.Wait()
 		os.Exit(1)
 	}
 
